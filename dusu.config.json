@@ -1,0 +1,38 @@
+{
+    "watchers" : [
+		{
+			"type": "steam",
+			"watchDir": "C:\\Program Files (x86)\\Steam\\userdata",
+			"defaultWebhookUrl": "https://discord.com/api/webhooks/<whid>/<token>",
+			"webhookUrlByGameId": [
+				{
+					"gameId": "489830",
+					"webhookUrl": "https://discord.com/api/webhooks/<whid>/<token>"
+				},
+				{
+					"gameId": "374320",
+					"webhookUrl": "https://discord.com/api/webhooks/<whid>/<token>"
+				}
+			]
+		},
+		{
+			"type": "xbox",
+			"watchDir": "C:\\Users\\<USERNAME>\\Videos\\Captures",
+			"defaultWebhookUrl": "https://discord.com/api/webhooks/<whid>/<token>",
+			"webhookUrlByGameId": [
+				{
+					"gameId": "Skyrim Special Edition",
+					"webhookUrl": "https://discord.com/api/webhooks/<whid>/<token>"
+				},
+				{
+					"gameId": "Minecraft",
+					"webhookUrl": "https://discord.com/api/webhooks/<whid>/<token>"
+				},
+				{
+					"gameId": "DARK SOULS III",
+					"webhookUrl": "https://discord.com/api/webhooks/<whid>/<token>"
+				}
+			]
+		}
+    ]
+}
