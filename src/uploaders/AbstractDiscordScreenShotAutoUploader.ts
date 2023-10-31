@@ -1,4 +1,4 @@
-import chokidar from 'chokidar';
+import chokidar, { FSWatcher } from 'chokidar';
 import { Webhook as DiscordWebHook } from 'discord-webhook-node';
 import path from 'path';
 import { DiscordScreenShotAutoUploaderInput, DiscordWebhookConfig, ScreenShotUploader } from './ScreenShotUploader.js';
@@ -19,6 +19,7 @@ export abstract class AbstractDiscordScreenShotAutoUploader implements ScreenSho
     private watchDirStartDelay: number;
     private fileWatcherEnabled = false;
     private acceptedExtensions: string[];
+    private watcher: FSWatcher;
 
     constructor(input: DiscordScreenShotAutoUploaderInput) {
         if (!input) {
@@ -36,14 +37,23 @@ export abstract class AbstractDiscordScreenShotAutoUploader implements ScreenSho
 
     abstract getGameId(filePath: string): string;
 
-    startWatch() {
-        const watcher = chokidar.watch(this.watchDir, { ignored: /^\./, persistent: true });
+    async startWatch() {
+        await this.stopWatch();
+        this.watcher = chokidar.watch(this.watchDir, { ignored: /^\./, persistent: true });
+
         setTimeout(() => {
             this.fileWatcherEnabled = true;
             console.log(`Watching dir "${this.watchDir}"`);
         }, this.watchDirStartDelay);
-        watcher
+        this.watcher
             .on('add', async path => setTimeout(async () => await this.checkFileUpload(path), 1000))
+    }
+
+    async stopWatch() {
+        if (this.watcher) {
+            await this.watcher.close();
+            console.log(`Dir ${this.watchDir} watcher closed`);
+        }
     }
 
     private async checkFileUpload(filePath: string) {
@@ -78,8 +88,6 @@ export abstract class AbstractDiscordScreenShotAutoUploader implements ScreenSho
     private getFileWebhookUrl(filePath: string) {
         const gameId = this.getGameId(filePath);
         const urlConfig = this.webhookUrlByGameId.find(item => item.gameId == gameId);
-        console.log('this.webhookUrlByGameId: ', this.webhookUrlByGameId);
-        console.log('gameId: ', gameId, 'urlConfig: ', urlConfig);
         return urlConfig?.webhookUrl || this.defaultWebhookUrl;
     }
 

@@ -1,5 +1,6 @@
 export interface ScreenShotUploader {
-    startWatch(): void;
+    startWatch(): Promise<void>;
+    stopWatch(): Promise<void>;
 }
 
 export interface DiscordScreenShotAutoUploaderInput {
