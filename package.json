@@ -1,0 +1,26 @@
+{
+  "name": "dusu",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "tsc & node ./dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.8.9"
+  },
+  "dependencies": {
+    "chokidar": "^3.5.3",
+    "discord-webhook-node": "^1.1.8",
+    "express": "^4.18.2",
+    "tsc": "^2.0.4",
+    "tsc-compiler": "^1.1.77",
+    "typescript": "^5.2.2"
+  }
+}
