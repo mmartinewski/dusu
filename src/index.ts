@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { ScreenShotUploaderFactory } from './uploaders/ScreenShotUploaderFactory.js';
 import { DiscordScreenShotAutoUploaderInput, ScreenShotUploader } from './uploaders/ScreenShotUploader.js';
 import chokidar, { FSWatcher } from 'chokidar';
+import { SystemConfig } from './db/pouchdb/SystemConfig.js';
 
 const app: Application = express();
 const PORT: number = 3001;
@@ -15,17 +16,43 @@ app.listen(PORT, (): void => {
     console.log('SERVER IS UP ON PORT:', PORT);
 });
 
-const uploaders: ScreenShotUploader[] = [];
+let uploaders: ScreenShotUploader[] = [];
+let mainWatcher;
+
+SystemConfig.initialize();
 
 async function startWatchers() {
     console.log('Starting watchers');
     const factory = new ScreenShotUploaderFactory();
     const configs = loadDusuConfigFile();
+    uploaders = [];
+
+    const watchDirs: string[] = [];
     for (const config of configs) {
         const uploader = factory.create(config);
+        watchDirs.push(config.watchDir);
         uploaders.push(uploader);
-        uploader.startWatch();
     }
+
+    console.log('watchDirs: ' + watchDirs)
+    console.log('uploaders: ', uploaders);
+
+    mainWatcher = chokidar.watch(watchDirs as ReadonlyArray<string>, { ignored: /^\./, persistent: true });
+
+    setTimeout(() => {
+        uploaders.forEach(uploader => uploader.startWatch())
+    }, 5000
+    );
+
+
+    // console.log('Starting watchers');
+    // const factory = new ScreenShotUploaderFactory();
+    // const configs = loadDusuConfigFile();
+    // for (const config of configs) {
+    //     const uploader = factory.create(config);
+    //     uploaders.push(uploader);
+    //     uploader.startWatch();
+    // }
 }
 
 async function stopWatchers() {
@@ -54,7 +81,7 @@ async function startWatchConfigFile() {
     let configInitialized = false;
     const configFile = './dusu.config.json';
     const watcher = chokidar.watch(configFile, { ignored: /^\./, persistent: true });
-    
+
     watcher.on('change', async path => setTimeout(async () => {
         if (configInitialized) {
             console.log('Config changed');

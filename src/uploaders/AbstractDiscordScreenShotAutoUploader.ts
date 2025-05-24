@@ -1,7 +1,12 @@
 import chokidar, { FSWatcher } from 'chokidar';
 import { Webhook as DiscordWebHook } from 'discord-webhook-node';
 import path from 'path';
+import fs from 'fs';
+
 import { DiscordScreenShotAutoUploaderInput, DiscordWebhookConfig, ScreenShotUploader } from './ScreenShotUploader.js';
+import { SystemConfig } from '../db/pouchdb/SystemConfig.js';
+import { FileUploadDB } from '../db/pouchdb/FileUploadDB.js';
+import { FileUpload } from '../model/FileUpload.js';
 
 const DEFAULT_FILE_WATCHER_START_DELAY = 5000;
 
@@ -20,6 +25,7 @@ export abstract class AbstractDiscordScreenShotAutoUploader implements ScreenSho
     private fileWatcherEnabled = false;
     private acceptedExtensions: string[];
     private watcher: FSWatcher;
+    private fileUploadDb: FileUploadDB = new FileUploadDB();
 
     constructor(input: DiscordScreenShotAutoUploaderInput) {
         if (!input) {
@@ -44,9 +50,9 @@ export abstract class AbstractDiscordScreenShotAutoUploader implements ScreenSho
         setTimeout(() => {
             this.fileWatcherEnabled = true;
             console.log(`Watching dir "${this.watchDir}"`);
-        }, this.watchDirStartDelay);
+        }, 1, this.watchDirStartDelay);
         this.watcher
-            .on('add', async path => setTimeout(async () => await this.checkFileUpload(path), 1000))
+            .on('add', async path => setTimeout(async () => await this.checkFileUpload(path, 3), 1000))
     }
 
     async stopWatch() {
@@ -56,19 +62,76 @@ export abstract class AbstractDiscordScreenShotAutoUploader implements ScreenSho
         }
     }
 
-    private async checkFileUpload(filePath: string) {
+    private async checkFileUpload(filePath: string, retries = 0) {
+        if (!this.isFileExtensionAccepted(filePath)) {
+            return;
+        }
+        if (!fs.existsSync(filePath)) {
+            console.log(`Ignoring file '${filePath}'. It no longer exists.`);
+            return;
+        }
         try {
+            if (!this.isWritable(filePath)) {
+                throw new Error(`File ${filePath} is locked`);
+            }
             if (!this.fileWatcherEnabled) {
                 return;
             }
-            if (this.isFileExtensionAccepted(filePath) && this.isValidFile(filePath)) {
-                await this.uploadFile(filePath);
-                console.log('File uploaded - ' + filePath);
+            if (!await this.mustUpload(filePath)) {
+                return;
             }
+            if (!this.isValidFile(filePath)) {
+                return;
+            }
+            await this.uploadFile(filePath);
         } catch (error) {
             console.log(error);
             console.log(`Failed to upload file "${filePath}"`);
+            if (retries > 0) {
+                console.log(`Trying again. Retries left ${retries}`);
+                setTimeout(() => this.checkFileUpload(filePath, retries - 1), 1000);
+            } else {
+                console.log('Giving up');
+            }
         }
+    }
+
+    private async mustUpload(filePath: string): Promise<boolean> {
+        return this.isFileDateValid(filePath) && !(await this.isFileAlreadyUploaded(filePath));
+    }
+
+    private isFileDateValid(filePath: string) {
+        const systemConfig = SystemConfig.getConfig();
+        const fileLastModified = this.getFileLastModified(filePath);
+        return fileLastModified.getTime() > systemConfig.uploadsStartDate.getTime();
+    }
+
+    private async isFileAlreadyUploaded(filePath: string): Promise<boolean> {
+        let fileUpload: FileUpload;
+        try {
+            fileUpload = await this.fileUploadDb.findByFilePath(filePath);
+        } catch(ex) {
+            if (ex.status !== 404) {
+                throw ex;
+            }
+        }
+        return fileUpload && fileUpload.uploaded;
+    }
+
+    private getFileLastModified(filePath: string): Date {
+        const stats = fs.statSync(filePath);
+        return new Date(stats.mtime);
+    }
+
+    private isWritable(filePath: string) {
+        let fileAccess = false
+        try {
+            fs.closeSync(fs.openSync(filePath, 'r+'))
+            fileAccess = true
+        } catch (err) {
+            console.log('can not open file!')
+        }
+        return fileAccess;
     }
 
     private isFileExtensionAccepted(filePath: string) {
@@ -80,6 +143,13 @@ export abstract class AbstractDiscordScreenShotAutoUploader implements ScreenSho
         if (hookUrl) {
             const hook = new DiscordWebHook(hookUrl);
             await hook.sendFile(filePath);
+            await this.fileUploadDb.save({
+                filePath: filePath,
+                uploaded: true,
+                fileModifiedAt: this.getFileLastModified(filePath),
+                uploadedAt: new Date(),
+            });
+            console.log(`File '${filePath}' uploaded sucessfully at ${new Date().toISOString()}`);
         } else {
             console.error('Hook url not found for file "' + filePath + '"');
         }
