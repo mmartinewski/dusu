@@ -157,7 +157,7 @@ export abstract class AbstractDiscordScreenShotAutoUploader implements ScreenSho
 
     private getFileWebhookUrl(filePath: string) {
         const gameId = this.getGameId(filePath);
-        const urlConfig = this.webhookUrlByGameId.find(item => item.gameId == gameId);
+        const urlConfig = this.webhookUrlByGameId.find(item => !item.disabled && item.gameId == gameId);
         return urlConfig?.webhookUrl || this.defaultWebhookUrl;
     }
 

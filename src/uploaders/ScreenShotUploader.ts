@@ -15,4 +15,6 @@ export interface DiscordScreenShotAutoUploaderInput {
 export interface DiscordWebhookConfig {
     gameId: string;
     webhookUrl: string;
+    disabled?: boolean;
+    description?: string;
 }
